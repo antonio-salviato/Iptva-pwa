@@ -32,9 +32,49 @@ function initPlayer() {
   if (Hls.isSupported()) {
     hls = new Hls({
       enableWorker: true,
-      lowLatencyMode: true
+      lowLatencyMode: true,
+      xhrSetup: function(xhr, url) {
+        // Intercept HTTP requests on HTTPS site (GitHub Pages) to bypass Mixed Content & CORS for stream fragments
+        if (location.protocol === 'https:' && url.startsWith('http://')) {
+          const proxied = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+          xhr.open('GET', proxied, true);
+        }
+      }
     });
   }
+}
+
+// CORS & Mixed Content Bypass Helper
+async function fetchWithCorsFallback(url, options = {}) {
+  // 1. Try direct fetch
+  try {
+    const directRes = await fetch(url, options);
+    if (directRes.ok) return directRes;
+  } catch (err) {
+    console.warn('Direct fetch failed (Mixed Content or CORS). Retrying with CORS Proxy...', err);
+  }
+
+  // 2. Try CorsProxy.io
+  try {
+    const proxyUrl1 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    const proxyRes1 = await fetch(proxyUrl1, options);
+    if (proxyRes1.ok) return proxyRes1;
+  } catch (err) {
+    console.warn('Corsproxy failed. Retrying with AllOrigins...', err);
+  }
+
+  // 3. Try AllOrigins Proxy Raw
+  try {
+    const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const proxyRes2 = await fetch(proxyUrl2, options);
+    if (proxyRes2.ok) return proxyRes2;
+  } catch (err) {
+    console.warn('AllOrigins failed. Trying ThingProxy...', err);
+  }
+
+  // 4. Try ThingProxy
+  const proxyUrl3 = `https://thingproxy.freeboard.io/fetch/${url}`;
+  return await fetch(proxyUrl3, options);
 }
 
 function setupEventListeners() {
@@ -120,7 +160,7 @@ function loadSavedPlaylist() {
 async function loadM3uPlaylist(url) {
   try {
     showLoading();
-    const res = await fetch(url);
+    const res = await fetchWithCorsFallback(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     allChannels = parseM3u(text);
@@ -146,7 +186,8 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     while (cleanServer.endsWith('/')) cleanServer = cleanServer.slice(0, -1);
 
     // Auth & Check
-    const authRes = await fetch(`${cleanServer}/player_api.php?username=${username}&password=${password}`);
+    const authUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+    const authRes = await fetchWithCorsFallback(authUrl);
     if (!authRes.ok) throw new Error(`HTTP ${authRes.status}`);
     const authData = await authRes.json();
     if (!authData.user_info || authData.user_info.auth === 0) {
@@ -156,7 +197,8 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     // Categories
     let catMap = {};
     try {
-      const catRes = await fetch(`${cleanServer}/player_api.php?username=${username}&password=${password}&action=get_live_categories`);
+      const catUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`;
+      const catRes = await fetchWithCorsFallback(catUrl);
       if (catRes.ok) {
         const catArray = await catRes.json();
         catArray.forEach(c => { catMap[c.category_id] = c.category_name; });
@@ -164,7 +206,8 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     } catch (e) {}
 
     // Streams
-    const streamsRes = await fetch(`${cleanServer}/player_api.php?username=${username}&password=${password}&action=get_live_streams`);
+    const streamsUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_streams`;
+    const streamsRes = await fetchWithCorsFallback(streamsUrl);
     if (!streamsRes.ok) throw new Error('Falha ao carregar lista de canais');
     const streams = await streamsRes.json();
 
@@ -175,7 +218,7 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
         name: s.name || `Canal ${streamId}`,
         group: catMap[s.category_id] || 'Canais Ao Vivo',
         logoUrl: s.stream_icon || null,
-        streamUrl: `${cleanServer}/live/${username}/${password}/${streamId}.m3u8`
+        streamUrl: `${cleanServer}/live/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.m3u8`
       };
     });
 
@@ -343,17 +386,21 @@ function playChannel(id) {
   document.getElementById('playerContainer').classList.remove('hidden');
 
   const video = document.getElementById('videoPlayer');
+  let targetUrl = channel.streamUrl;
 
   if (Hls.isSupported()) {
-    hls.loadSource(channel.streamUrl);
+    hls.loadSource(targetUrl);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      video.play();
+      video.play().catch(e => console.log('Autoplay error:', e));
     });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     // Safari / iOS Native HLS Support
-    video.src = channel.streamUrl;
-    video.play();
+    if (location.protocol === 'https:' && targetUrl.startsWith('http://')) {
+      targetUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    }
+    video.src = targetUrl;
+    video.play().catch(e => console.log('Autoplay error:', e));
   }
 
   // Record History
