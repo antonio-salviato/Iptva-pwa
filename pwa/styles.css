@@ -1,18 +1,23 @@
-/* IPTV Cast / Firehair IPTV PWA - Android Parity Design */
+/* IPTV Cast PWA - Pixel Perfect Android Theme */
 :root {
   --bg-primary: #0B0F19;
   --bg-surface: #162032;
   --bg-surface-variant: #1E293B;
+  --border-color: #334155;
+  
   --cyan-primary: #06B6D4;
-  --cyan-hover: #38BDF8;
+  --cyan-light: #38BDF8;
   --cyan-glow: rgba(6, 182, 212, 0.2);
+  --cyan-subtle: rgba(6, 182, 212, 0.12);
+  
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
-  --border-color: #334155;
-  --danger-color: #EF4444;
+  
   --live-red: #DC2626;
-  --warning-color: #F59E0B;
+  --error-red: #EF4444;
+  --amber-gold: #F59E0B;
+  --success-green: #2E7D32;
 }
 
 * {
@@ -32,48 +37,48 @@ body {
   overflow-x: hidden;
 }
 
-/* Header - Matches Material 3 TopAppBar */
+/* Material 3 TopAppBar */
 .app-header {
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
-  padding: 12px 16px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 .brand-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .brand-icon-pill {
-  background: var(--cyan-glow);
+  background: rgba(6, 182, 212, 0.2);
   color: var(--cyan-primary);
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
 .brand-title {
-  font-size: 1.15rem;
+  font-size: 1.12rem;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  line-height: 1.2;
 }
 
 .channel-count-badge {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: var(--text-secondary);
   font-weight: 500;
 }
@@ -81,7 +86,7 @@ body {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .btn-icon {
@@ -96,7 +101,7 @@ body {
   justify-content: center;
   cursor: pointer;
   font-size: 1.1rem;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .btn-icon:hover, .btn-icon:active {
@@ -108,7 +113,7 @@ body {
   background: var(--cyan-glow);
 }
 
-/* Video Player Container */
+/* Player Wrapper */
 .player-wrapper {
   background: #000;
   width: 100%;
@@ -126,7 +131,7 @@ video {
   object-fit: contain;
 }
 
-/* Search Bar Container */
+/* Search Bar (Android Rounded Container) */
 .search-container {
   padding: 10px 16px;
   background: var(--bg-primary);
@@ -149,10 +154,10 @@ video {
 .search-input {
   width: 100%;
   background: var(--bg-surface-variant);
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(6, 182, 212, 0.5);
   color: var(--text-primary);
-  padding: 10px 14px 10px 40px;
-  border-radius: 24px;
+  padding: 10px 14px 10px 42px;
+  border-radius: 23px;
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -163,7 +168,7 @@ video {
   box-shadow: 0 0 0 3px var(--cyan-glow);
 }
 
-/* Category Chips Bar */
+/* Category Chip Row (LazyRow Style) */
 .categories-bar {
   display: flex;
   gap: 8px;
@@ -179,9 +184,9 @@ video {
 .chip {
   background: var(--bg-surface-variant);
   color: var(--text-secondary);
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.85rem;
+  padding: 7px 16px;
+  border-radius: 16px;
+  font-size: 0.82rem;
   font-weight: 600;
   border: 1px solid var(--border-color);
   cursor: pointer;
@@ -191,7 +196,7 @@ video {
 
 .chip:hover {
   color: var(--text-primary);
-  border-color: var(--cyan-hover);
+  border-color: var(--cyan-light);
 }
 
 .chip.active {
@@ -199,10 +204,10 @@ video {
   color: #0B0F19;
   border-color: var(--cyan-primary);
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.35);
 }
 
-/* Channel List & Folder View */
+/* Channel List Container */
 .channel-list {
   flex: 1;
   padding: 12px 16px 32px 16px;
@@ -211,88 +216,122 @@ video {
   gap: 10px;
 }
 
-/* Channel Card */
+/* Channel Row Card (Matching ChannelCard.kt) */
 .channel-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 12px 16px;
+  border-radius: 14px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .channel-card:hover {
+  border-color: var(--cyan-light);
   transform: translateY(-1px);
-  border-color: var(--cyan-hover);
 }
 
 .channel-card.active {
   border-color: var(--cyan-primary);
   background: var(--bg-surface-variant);
-  box-shadow: 0 0 12px var(--cyan-glow);
+  box-shadow: 0 0 14px var(--cyan-glow);
 }
 
-.channel-logo {
-  width: 46px;
-  height: 46px;
+.channel-logo-container {
+  width: 56px;
+  height: 56px;
   border-radius: 10px;
-  object-fit: contain;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-surface-variant);
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
   flex-shrink: 0;
-}
-
-.channel-info {
-  flex: 1;
   overflow: hidden;
 }
 
-.channel-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.channel-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
 }
 
-.channel-name {
+.channel-logo-icon {
+  color: var(--cyan-primary);
+  font-size: 1.4rem;
+}
+
+.channel-details {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.channel-title {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.live-badge {
-  background: var(--live-red);
-  color: #FFF;
-  font-size: 0.65rem;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
+.channel-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
 }
 
-.channel-group {
-  font-size: 0.78rem;
+.group-badge {
+  background: var(--bg-surface-variant);
   color: var(--text-secondary);
-  margin-top: 2px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--live-red);
+}
+
+.live-text {
+  color: var(--live-red);
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.5px;
 }
 
 .btn-fav {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 1.3rem;
   cursor: pointer;
-  padding: 4px;
-  transition: color 0.2s, transform 0.2s;
+  padding: 6px;
+  transition: transform 0.2s, color 0.2s;
 }
 
 .btn-fav:hover {
@@ -300,16 +339,17 @@ video {
 }
 
 .btn-fav.active {
-  color: #F59E0B;
+  color: var(--live-red);
 }
 
-/* Folder View Mode Components */
+/* Folder Navigation Card (Matching FolderCard.kt) */
 .folder-card {
-  background: var(--bg-surface);
+  background: var(--bg-surface-variant);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   margin-bottom: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
 
 .folder-header {
@@ -319,66 +359,79 @@ video {
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
-  background: var(--bg-surface);
+  background: var(--bg-surface-variant);
   transition: background 0.2s;
 }
 
 .folder-header:hover {
-  background: var(--bg-surface-variant);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .folder-title-box {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
-.folder-icon {
-  font-size: 1.2rem;
+.folder-icon-pill {
+  background: rgba(6, 182, 212, 0.18);
   color: var(--cyan-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.folder-info {
+  display: flex;
+  flex-direction: column;
 }
 
 .folder-name {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
+  color: var(--text-primary);
 }
 
 .folder-count {
-  background: var(--bg-surface-variant);
+  font-size: 0.74rem;
   color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 12px;
+  margin-top: 2px;
 }
 
 .folder-arrow {
-  color: var(--text-secondary);
+  color: var(--cyan-primary);
+  font-size: 1.1rem;
   transition: transform 0.3s;
 }
 
 .folder-card.expanded .folder-arrow {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 
 .folder-content {
-  padding: 8px 12px 12px 12px;
+  padding: 8px 10px 12px 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: var(--bg-surface);
   border-top: 1px solid var(--border-color);
-  background: rgba(11, 15, 25, 0.4);
 }
 
-/* Modal Dialog - Material 3 Dark Dialog */
+/* Material 3 Dark Dialog (Matching PlaylistSetupDialog.kt) */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -393,13 +446,13 @@ video {
   padding: 24px;
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: 92vh;
   overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
 }
 
 .modal-title {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
   margin-bottom: 16px;
   color: var(--text-primary);
@@ -408,13 +461,42 @@ video {
   gap: 10px;
 }
 
+.modal-title-icon {
+  color: var(--cyan-primary);
+  font-size: 1.3rem;
+}
+
+.active-connection-card {
+  background: var(--bg-surface-variant);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.active-connection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cyan-primary);
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-bottom: 8px;
+}
+
+.active-connection-detail {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 .tab-group {
   display: flex;
   background: var(--bg-surface-variant);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .tab-btn {
@@ -479,7 +561,7 @@ video {
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .btn-secondary {

@@ -1,4 +1,4 @@
-// IPTV Cast / Firehair IPTV PWA - Core Logic (Android Parity)
+// IPTV Cast PWA - Core Logic (100% Android App Parity)
 let allChannels = [];
 let categories = ['Todos', 'Favoritos', 'Histórico'];
 let selectedCategory = 'Todos';
@@ -7,13 +7,16 @@ let selectedChannel = null;
 let isFolderViewMode = false;
 let expandedFolders = {};
 let hls = null;
+let selectedProxyMode = 'auto';
+let currentConnectionInfo = null;
 
 const STORAGE_KEYS = {
   FAVORITES: 'firehair_pwa_favs',
   HISTORY: 'firehair_pwa_history',
   PLAYLIST_URL: 'firehair_pwa_m3u_url',
   XTREAM_CREDS: 'firehair_pwa_xtream',
-  FOLDER_VIEW: 'firehair_pwa_folder_mode'
+  FOLDER_VIEW: 'firehair_pwa_folder_mode',
+  PROXY_MODE: 'firehair_pwa_proxy_mode'
 };
 
 // Initialize App
@@ -38,7 +41,6 @@ function initPlayer() {
       enableWorker: true,
       lowLatencyMode: true,
       xhrSetup: function(xhr, url) {
-        // Intercept HTTP requests on HTTPS site (GitHub Pages) to bypass Mixed Content & CORS for stream fragments
         if (location.protocol === 'https:' && url.startsWith('http://')) {
           const proxied = `https://corsproxy.io/?${encodeURIComponent(url)}`;
           xhr.open('GET', proxied, true);
@@ -50,6 +52,11 @@ function initPlayer() {
 
 function loadSavedPreferences() {
   isFolderViewMode = localStorage.getItem(STORAGE_KEYS.FOLDER_VIEW) === 'true';
+  selectedProxyMode = localStorage.getItem(STORAGE_KEYS.PROXY_MODE) || 'auto';
+
+  const selectProxy = document.getElementById('selectProxyMode');
+  if (selectProxy) selectProxy.value = selectedProxyMode;
+
   updateFolderToggleButton();
 }
 
@@ -68,23 +75,41 @@ function updateFolderToggleButton() {
 
 // Multi-Proxy CORS & Mixed Content Bypass Helper
 async function fetchWithCorsFallback(url, options = {}) {
-  const proxies = [
-    (u) => u, // Direct fetch
-    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    (u) => `https://thingproxy.freeboard.io/fetch/${u}`
-  ];
+  let targetUrls = [];
+
+  if (selectedProxyMode === 'auto' && url.startsWith('http://')) {
+    const httpsUrl = url.replace('http://', 'https://');
+    targetUrls.push({ name: 'HTTPS Direto', url: httpsUrl });
+  }
+
+  if (selectedProxyMode === 'direct' || selectedProxyMode === 'auto') {
+    targetUrls.push({ name: 'Conexão Direta', url: url });
+  }
+
+  if (selectedProxyMode === 'corsproxy' || selectedProxyMode === 'auto') {
+    targetUrls.push({ name: 'Proxy (CorsProxy)', url: `https://corsproxy.io/?${encodeURIComponent(url)}` });
+  }
+  if (selectedProxyMode === 'codetabs' || selectedProxyMode === 'auto') {
+    targetUrls.push({ name: 'Proxy (CodeTabs)', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` });
+  }
+  if (selectedProxyMode === 'allorigins' || selectedProxyMode === 'auto') {
+    targetUrls.push({ name: 'Proxy (AllOrigins)', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` });
+  }
+  if (selectedProxyMode === 'auto') {
+    targetUrls.push({ name: 'Proxy (ThingProxy)', url: `https://thingproxy.freeboard.io/fetch/${url}` });
+  }
 
   let lastError = null;
 
-  for (let i = 0; i < proxies.length; i++) {
+  for (let i = 0; i < targetUrls.length; i++) {
+    const item = targetUrls[i];
     try {
-      const targetUrl = proxies[i](url);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per proxy
+      showLoading('Conectando ao servidor...', `Tentativa ${i + 1}/${targetUrls.length}: ${item.name}`);
 
-      const res = await fetch(targetUrl, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(item.url, {
         ...options,
         signal: controller.signal
       });
@@ -95,7 +120,6 @@ async function fetchWithCorsFallback(url, options = {}) {
       }
     } catch (err) {
       lastError = err;
-      console.warn(`Proxy ${i + 1}/${proxies.length} failed for ${url}:`, err);
     }
   }
 
@@ -103,7 +127,14 @@ async function fetchWithCorsFallback(url, options = {}) {
 }
 
 function setupEventListeners() {
-  // Search toggle
+  const selectProxy = document.getElementById('selectProxyMode');
+  if (selectProxy) {
+    selectProxy.addEventListener('change', (e) => {
+      selectedProxyMode = e.target.value;
+      localStorage.setItem(STORAGE_KEYS.PROXY_MODE, selectedProxyMode);
+    });
+  }
+
   document.getElementById('btnSearchToggle').addEventListener('click', () => {
     const searchContainer = document.getElementById('searchContainer');
     searchContainer.classList.toggle('hidden');
@@ -117,12 +148,10 @@ function setupEventListeners() {
     renderChannels();
   });
 
-  // Refresh
   document.getElementById('btnRefresh').addEventListener('click', () => {
     loadSavedPlaylist();
   });
 
-  // Folder View Toggle
   document.getElementById('btnFolderToggle').addEventListener('click', () => {
     isFolderViewMode = !isFolderViewMode;
     localStorage.setItem(STORAGE_KEYS.FOLDER_VIEW, isFolderViewMode.toString());
@@ -130,7 +159,6 @@ function setupEventListeners() {
     renderChannels();
   });
 
-  // Settings Modal
   document.getElementById('btnSettings').addEventListener('click', () => {
     openModal();
   });
@@ -192,11 +220,26 @@ function switchTab(tab) {
 }
 
 function openModal() {
+  updateActiveConnectionCard();
   document.getElementById('settingsModal').classList.remove('hidden');
 }
 
 function closeModal() {
   document.getElementById('settingsModal').classList.add('hidden');
+}
+
+function updateActiveConnectionCard() {
+  const cardElem = document.getElementById('activeConnectionCard');
+  if (!cardElem) return;
+
+  if (currentConnectionInfo) {
+    cardElem.classList.remove('hidden');
+    document.getElementById('connType').innerText = currentConnectionInfo.type;
+    document.getElementById('connUrl').innerText = currentConnectionInfo.url;
+    document.getElementById('connCount').innerText = `${currentConnectionInfo.count} canais`;
+  } else {
+    cardElem.classList.add('hidden');
+  }
 }
 
 // Loaders
@@ -220,7 +263,7 @@ function loadSavedPlaylist() {
 
 async function loadM3uPlaylist(url) {
   try {
-    showLoading('Baixando playlist M3U...');
+    showLoading('Baixando playlist M3U...', 'Iniciando conexão...');
     const res = await fetchWithCorsFallback(url);
     if (!res.ok) throw new Error(`Status ${res.status}`);
     const text = await res.text();
@@ -230,11 +273,18 @@ async function loadM3uPlaylist(url) {
     }
     localStorage.setItem(STORAGE_KEYS.PLAYLIST_URL, url);
     localStorage.removeItem(STORAGE_KEYS.XTREAM_CREDS);
+    
+    currentConnectionInfo = {
+      type: 'Playlist M3U / M3U8',
+      url: url,
+      count: allChannels.length
+    };
+
     updateCategories();
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\nVerifique se o link da sua playlist está correto e ativo.`);
+    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\n💡 DICA DE SOLUÇÃO:\n1. Altere o "Modo Proxy CORS" nas Configurações ⚙️.\n2. No Chrome do celular, abra as Configurações do Site 🔒 ➔ Conteúdo não seguro ➔ Permitir.`);
   } finally {
     hideLoading();
   }
@@ -242,7 +292,7 @@ async function loadM3uPlaylist(url) {
 
 async function loadXtreamPlaylist(serverUrl, username, password) {
   try {
-    showLoading('Conectando ao servidor Xtream Codes...');
+    showLoading('Conectando ao servidor Xtream Codes...', 'Iniciando autenticação...');
     let cleanServer = serverUrl.trim();
     if (!cleanServer.startsWith('http://') && !cleanServer.startsWith('https://')) {
       cleanServer = `http://${cleanServer}`;
@@ -253,13 +303,13 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
 
     // Attempt 1: Xtream Codes JSON API (player_api.php)
     try {
-      showLoading('Autenticando via API...');
+      showLoading('Autenticando via API Xtream...', 'Buscando dados da conta...');
       const authUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
       const authRes = await fetchWithCorsFallback(authUrl);
       if (authRes.ok) {
         const authData = await authRes.json();
         if (authData.user_info && authData.user_info.auth !== 0) {
-          showLoading('Obtendo categorias e canais...');
+          showLoading('Obtendo categorias e canais...', 'Carregando lista de transmissão...');
 
           let catMap = {};
           try {
@@ -296,7 +346,7 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
 
     // Attempt 2: Fallback to get.php (M3U format) if API JSON was empty or failed
     if (loadedChannels.length === 0) {
-      showLoading('Carregando via modo M3U do servidor (get.php)...');
+      showLoading('Carregando via modo M3U do servidor (get.php)...', 'Processando lista...');
       const m3uFallbackUrl = `${cleanServer}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
       const m3uRes = await fetchWithCorsFallback(m3uFallbackUrl);
       if (!m3uRes.ok) throw new Error(`Servidor respondeu com status ${m3uRes.status}`);
@@ -311,11 +361,18 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     allChannels = loadedChannels;
     localStorage.setItem(STORAGE_KEYS.XTREAM_CREDS, JSON.stringify({ server: cleanServer, user: username, pass: password }));
     localStorage.removeItem(STORAGE_KEYS.PLAYLIST_URL);
+
+    currentConnectionInfo = {
+      type: 'API Xtream Codes',
+      url: cleanServer,
+      count: allChannels.length
+    };
+
     updateCategories();
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\nDica: Verifique se o servidor, usuário e senha estão corretos.`);
+    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\n💡 DICA DE SOLUÇÃO:\n1. Altere o "Modo Proxy CORS" nas Configurações ⚙️.\n2. No Chrome do celular, toque no ícone do Cadeado 🔒 ➔ Configurações do site ➔ Conteúdo não seguro ➔ Permitir.`);
   } finally {
     hideLoading();
   }
@@ -345,6 +402,11 @@ function loadDemoChannels() {
       streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
     }
   ];
+  currentConnectionInfo = {
+    type: 'Canais Demonstração',
+    url: 'demo.iptvcast.app',
+    count: allChannels.length
+  };
   updateCategories();
   renderChannels();
   closeModal();
@@ -479,11 +541,13 @@ function renderChannels() {
         <div class="folder-card ${isExpanded ? 'expanded' : ''}">
           <div class="folder-header" onclick="toggleFolderExpand('${gName.replace(/'/g, "\\'")}')">
             <div class="folder-title-box">
-              <span class="folder-icon">📁</span>
-              <span class="folder-name">${gName}</span>
-              <span class="folder-count">${chList.length} canais</span>
+              <div class="folder-icon-pill">📁</div>
+              <div class="folder-info">
+                <span class="folder-name">${gName}</span>
+                <span class="folder-count">${chList.length} canais nesta pasta</span>
+              </div>
             </div>
-            <span class="folder-arrow">▼</span>
+            <span class="folder-arrow">▶</span>
           </div>
           ${isExpanded ? `<div class="folder-content">${cardsHtml}</div>` : ''}
         </div>
@@ -498,19 +562,32 @@ function renderChannels() {
 
 function renderChannelCardHtml(ch, favs) {
   const isFav = favs.includes(ch.id);
-  const logoHtml = ch.logoUrl ? `<img src="${ch.logoUrl}" class="channel-logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Television_icon.svg/40px-Television_icon.svg.png'"/>` : `<div class="channel-logo">📺</div>`;
+  const isSelected = selectedChannel && selectedChannel.id === ch.id;
+
+  const logoHtml = ch.logoUrl 
+    ? `<img src="${ch.logoUrl}" class="channel-logo-img" onerror="this.outerHTML='<span class=\\'channel-logo-icon\\'>📺</span>'"/>` 
+    : `<span class="channel-logo-icon">📺</span>`;
 
   return `
-    <div class="channel-card ${selectedChannel && selectedChannel.id === ch.id ? 'active' : ''}" onclick="playChannel('${ch.id}')">
-      ${logoHtml}
-      <div class="channel-info">
-        <div class="channel-name-row">
-          <span class="channel-name">${ch.name}</span>
-          <span class="live-badge">AO VIVO</span>
-        </div>
-        <div class="channel-group">${ch.group}</div>
+    <div class="channel-card ${isSelected ? 'active' : ''}" onclick="playChannel('${ch.id}')">
+      <div class="channel-logo-container">
+        ${logoHtml}
       </div>
-      <button class="btn-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${ch.id}', event)">★</button>
+      <div class="channel-details">
+        <div class="channel-title">${ch.name}</div>
+        <div class="channel-sub-row">
+          <span class="group-badge">${ch.group}</span>
+          ${isSelected ? `
+            <div class="live-indicator">
+              <span class="live-dot"></span>
+              <span class="live-text">AO VIVO</span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+      <button class="btn-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${ch.id}', event)">
+        ${isFav ? '❤️' : '🤍'}
+      </button>
     </div>
   `;
 }
@@ -532,7 +609,6 @@ function playChannel(id) {
       video.play().catch(e => console.log('Autoplay error:', e));
     });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Safari / iOS Native HLS Support
     if (location.protocol === 'https:' && targetUrl.startsWith('http://')) {
       targetUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
     }
@@ -540,10 +616,8 @@ function playChannel(id) {
     video.play().catch(e => console.log('Autoplay error:', e));
   }
 
-  // Scroll to player smoothly
   document.getElementById('playerContainer').scrollIntoView({ behavior: 'smooth' });
 
-  // Record History
   let history = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY) || '[]');
   history = history.filter(hId => hId !== id);
   history.unshift(id);
@@ -552,9 +626,11 @@ function playChannel(id) {
   renderChannels();
 }
 
-function showLoading(msg = 'Carregando canais...') {
+function showLoading(msg = 'Carregando canais...', subtext = 'Aguarde um momento...') {
   const textElem = document.getElementById('loadingText');
+  const subtextElem = document.getElementById('loadingSubtext');
   if (textElem) textElem.innerText = msg;
+  if (subtextElem) subtextElem.innerText = subtext;
   document.getElementById('loadingOverlay').classList.remove('hidden');
 }
 

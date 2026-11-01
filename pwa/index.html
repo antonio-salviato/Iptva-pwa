@@ -20,7 +20,7 @@
 </head>
 <body>
 
-  <!-- App Header -->
+  <!-- App Header (Material 3 TopAppBar) -->
   <header class="app-header">
     <div class="brand-container">
       <div class="brand-icon-pill">📺</div>
@@ -57,10 +57,25 @@
   <!-- Channel List & Folder View -->
   <main class="channel-list" id="channelList"></main>
 
-  <!-- Settings Modal -->
+  <!-- Settings Modal (PlaylistSetupDialog.kt) -->
   <div class="modal-overlay hidden" id="settingsModal">
     <div class="modal-content">
-      <div class="modal-title">⚙️ Configurar Playlist IPTV</div>
+      <div class="modal-title">
+        <span class="modal-title-icon">🔗</span>
+        <span>Gerenciar Conexão IPTV</span>
+      </div>
+
+      <!-- Active Connection Card -->
+      <div class="active-connection-card hidden" id="activeConnectionCard">
+        <div class="active-connection-header">
+          <span>✅ Conexão Ativa</span>
+        </div>
+        <div class="active-connection-detail">
+          <div><b>Tipo:</b> <span id="connType"></span></div>
+          <div><b>Servidor:</b> <span id="connUrl"></span></div>
+          <div><b>Canais:</b> <span id="connCount"></span></div>
+        </div>
+      </div>
 
       <div class="tab-group">
         <button class="tab-btn active" id="tabM3u">Playlist M3U</button>
@@ -95,6 +110,22 @@
 
       <hr style="border:0; border-top:1px solid var(--border-color); margin:18px 0;" />
 
+      <!-- Proxy Options -->
+      <div class="form-group">
+        <label class="form-label">Modo Proxy CORS (Para Servidores HTTP)</label>
+        <select id="selectProxyMode" class="form-input">
+          <option value="auto">Automático (Testa HTTPS + 5 Proxies)</option>
+          <option value="corsproxy">CorsProxy.io</option>
+          <option value="codetabs">CodeTabs Proxy</option>
+          <option value="allorigins">AllOrigins Raw</option>
+          <option value="direct">Direto (Sem Proxy)</option>
+        </select>
+      </div>
+
+      <div style="background: var(--bg-primary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
+        💡 <b>Dica para Chrome no Celular:</b> Se o seu servidor for HTTP e der erro de bloqueio no navegador, toque no ícone de <b>Cadeado 🔒 / Configurações do site</b> ➔ <b>Conteúdo não seguro</b> ➔ Marcar como <b>Permitir</b>.
+      </div>
+
       <button class="btn-secondary" id="btnPresetPluto">📺 Carregar Pluto TV & Canais BR (Gratuito)</button>
       <button class="btn-secondary" id="btnPresetDemo">🎬 Testar com Canais Demo</button>
       <button class="btn-secondary" id="btnCloseModal" style="margin-top:12px;">Fechar</button>
@@ -103,9 +134,10 @@
 
   <!-- Loading Overlay -->
   <div class="modal-overlay hidden" id="loadingOverlay">
-    <div style="background:var(--bg-surface); border: 1px solid var(--border-color); padding:28px 36px; border-radius:16px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div style="background:var(--bg-surface); border: 1px solid var(--border-color); padding:28px 36px; border-radius:16px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 320px;">
       <div style="font-size:2rem; margin-bottom:12px;">⏳</div>
-      <div id="loadingText" style="font-weight:600; font-size:1rem; color:var(--text-primary);">Carregando canais...</div>
+      <div id="loadingText" style="font-weight:600; font-size:1rem; color:var(--text-primary); margin-bottom: 6px;">Carregando canais...</div>
+      <div id="loadingSubtext" style="font-size:0.75rem; color:var(--text-secondary);">Aguarde um momento...</div>
     </div>
   </div>
 
