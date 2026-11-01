@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   FAVORITES: 'firehair_pwa_favs',
   HISTORY: 'firehair_pwa_history',
   PLAYLIST_URL: 'firehair_pwa_m3u_url',
+  PLAYLIST_CONTENT: 'firehair_pwa_m3u_raw',
   XTREAM_CREDS: 'firehair_pwa_xtream',
   FOLDER_VIEW: 'firehair_pwa_folder_mode',
   PROXY_MODE: 'firehair_pwa_proxy_mode'
@@ -167,13 +168,11 @@ function setupEventListeners() {
     closeModal();
   });
 
-  document.getElementById('tabM3u').addEventListener('click', () => {
-    switchTab('m3u');
-  });
-
-  document.getElementById('tabXtream').addEventListener('click', () => {
-    switchTab('xtream');
-  });
+  // Tab Switching in Settings
+  document.getElementById('tabM3u').addEventListener('click', () => switchTab('m3u'));
+  document.getElementById('tabXtream').addEventListener('click', () => switchTab('xtream'));
+  document.getElementById('tabFile').addEventListener('click', () => switchTab('file'));
+  document.getElementById('tabText').addEventListener('click', () => switchTab('text'));
 
   document.getElementById('btnConnectM3u').addEventListener('click', () => {
     const url = document.getElementById('inputM3uUrl').value.trim();
@@ -196,6 +195,45 @@ function setupEventListeners() {
     }
   });
 
+  // Local M3U File Processing
+  document.getElementById('btnProcessFile').addEventListener('click', () => {
+    const fileInput = document.getElementById('inputM3uFile');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Por favor, selecione um arquivo .m3u ou .m3u8 no seu aparelho.');
+      return;
+    }
+
+    const file = fileInput.files[0];
+    showLoading('Lendo arquivo local...', file.name);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        loadM3uContent(text, `Arquivo Local (${file.name})`);
+      } catch (err) {
+        alert(`Erro ao ler arquivo: ${err.message}`);
+      } finally {
+        hideLoading();
+      }
+    };
+    reader.onerror = () => {
+      alert('Erro ao carregar o arquivo local.');
+      hideLoading();
+    };
+    reader.readAsText(file);
+  });
+
+  // Paste Text M3U Processing
+  document.getElementById('btnProcessText').addEventListener('click', () => {
+    const text = document.getElementById('textareaM3uText').value.trim();
+    if (!text) {
+      alert('Por favor, cole o conteúdo do seu arquivo M3U no campo de texto.');
+      return;
+    }
+    loadM3uContent(text, 'Texto M3U Colado');
+  });
+
   document.getElementById('btnPresetPluto').addEventListener('click', () => {
     loadM3uPlaylist('https://iptv-org.github.io/iptv/countries/br.m3u');
   });
@@ -206,17 +244,24 @@ function setupEventListeners() {
 }
 
 function switchTab(tab) {
-  if (tab === 'm3u') {
-    document.getElementById('tabM3u').classList.add('active');
-    document.getElementById('tabXtream').classList.remove('active');
-    document.getElementById('formM3u').classList.remove('hidden');
-    document.getElementById('formXtream').classList.add('hidden');
-  } else {
-    document.getElementById('tabXtream').classList.add('active');
-    document.getElementById('tabM3u').classList.remove('active');
-    document.getElementById('formXtream').classList.remove('hidden');
-    document.getElementById('formM3u').classList.add('hidden');
-  }
+  const tabs = ['m3u', 'xtream', 'file', 'text'];
+  tabs.forEach(t => {
+    const tabBtn = document.getElementById(`tab${capitalize(t)}`);
+    const formElem = document.getElementById(`form${capitalize(t)}`);
+    if (tabBtn && formElem) {
+      if (t === tab) {
+        tabBtn.classList.add('active');
+        formElem.classList.remove('hidden');
+      } else {
+        tabBtn.classList.remove('active');
+        formElem.classList.add('hidden');
+      }
+    }
+  });
+}
+
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function openModal() {
@@ -244,10 +289,13 @@ function updateActiveConnectionCard() {
 
 // Loaders
 function loadSavedPlaylist() {
+  const savedContent = localStorage.getItem(STORAGE_KEYS.PLAYLIST_CONTENT);
   const savedM3u = localStorage.getItem(STORAGE_KEYS.PLAYLIST_URL);
   const savedXtream = localStorage.getItem(STORAGE_KEYS.XTREAM_CREDS);
 
-  if (savedXtream) {
+  if (savedContent) {
+    loadM3uContent(savedContent, 'Lista Local Salva', false);
+  } else if (savedXtream) {
     try {
       const creds = JSON.parse(savedXtream);
       loadXtreamPlaylist(creds.server, creds.user, creds.pass);
@@ -261,6 +309,30 @@ function loadSavedPlaylist() {
   }
 }
 
+function loadM3uContent(text, sourceName = 'Arquivo Local M3U', saveToStorage = true) {
+  allChannels = parseM3u(text);
+  if (allChannels.length === 0) {
+    alert('Nenhum canal válido foi encontrado no conteúdo fornecido.');
+    return;
+  }
+
+  if (saveToStorage) {
+    localStorage.setItem(STORAGE_KEYS.PLAYLIST_CONTENT, text);
+    localStorage.removeItem(STORAGE_KEYS.PLAYLIST_URL);
+    localStorage.removeItem(STORAGE_KEYS.XTREAM_CREDS);
+  }
+
+  currentConnectionInfo = {
+    type: sourceName,
+    url: 'Importado Localmente (Sem Bloqueios de Rede)',
+    count: allChannels.length
+  };
+
+  updateCategories();
+  renderChannels();
+  closeModal();
+}
+
 async function loadM3uPlaylist(url) {
   try {
     showLoading('Baixando playlist M3U...', 'Iniciando conexão...');
@@ -272,10 +344,11 @@ async function loadM3uPlaylist(url) {
       throw new Error('A lista M3U baixada não contém canais válidos.');
     }
     localStorage.setItem(STORAGE_KEYS.PLAYLIST_URL, url);
+    localStorage.removeItem(STORAGE_KEYS.PLAYLIST_CONTENT);
     localStorage.removeItem(STORAGE_KEYS.XTREAM_CREDS);
-    
+
     currentConnectionInfo = {
-      type: 'Playlist M3U / M3U8',
+      type: 'Playlist M3U via Link',
       url: url,
       count: allChannels.length
     };
@@ -284,7 +357,7 @@ async function loadM3uPlaylist(url) {
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\n💡 DICA DE SOLUÇÃO:\n1. Altere o "Modo Proxy CORS" nas Configurações ⚙️.\n2. No Chrome do celular, abra as Configurações do Site 🔒 ➔ Conteúdo não seguro ➔ Permitir.`);
+    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\n💡 OUTRAS OPÇÕES:\n1. Baixe o arquivo .m3u no seu celular e use a aba "📁 Arquivo" nas Configurações.\n2. Ou copie o texto do arquivo e use a aba "📋 Colar".`);
   } finally {
     hideLoading();
   }
@@ -361,6 +434,7 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     allChannels = loadedChannels;
     localStorage.setItem(STORAGE_KEYS.XTREAM_CREDS, JSON.stringify({ server: cleanServer, user: username, pass: password }));
     localStorage.removeItem(STORAGE_KEYS.PLAYLIST_URL);
+    localStorage.removeItem(STORAGE_KEYS.PLAYLIST_CONTENT);
 
     currentConnectionInfo = {
       type: 'API Xtream Codes',
@@ -372,7 +446,7 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\n💡 DICA DE SOLUÇÃO:\n1. Altere o "Modo Proxy CORS" nas Configurações ⚙️.\n2. No Chrome do celular, toque no ícone do Cadeado 🔒 ➔ Configurações do site ➔ Conteúdo não seguro ➔ Permitir.`);
+    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\n💡 OUTRA ABORDAGEM:\nAbra a URL no seu navegador para baixar o arquivo .m3u, depois use a aba "📁 Arquivo" nas Configurações para carregar instantaneamente.`);
   } finally {
     hideLoading();
   }

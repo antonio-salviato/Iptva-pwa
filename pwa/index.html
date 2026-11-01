@@ -77,9 +77,11 @@
         </div>
       </div>
 
-      <div class="tab-group">
-        <button class="tab-btn active" id="tabM3u">Playlist M3U</button>
-        <button class="tab-btn" id="tabXtream">Xtream Codes API</button>
+      <div class="tab-group" style="display: flex; gap: 4px; overflow-x: auto;">
+        <button class="tab-btn active" id="tabM3u">URL M3U</button>
+        <button class="tab-btn" id="tabXtream">Xtream Codes</button>
+        <button class="tab-btn" id="tabFile">📁 Arquivo</button>
+        <button class="tab-btn" id="tabText">📋 Colar</button>
       </div>
 
       <!-- M3U Form -->
@@ -88,7 +90,7 @@
           <label class="form-label">URL da Playlist M3U / M3U8</label>
           <input type="url" id="inputM3uUrl" class="form-input" placeholder="http://servidor.com/get.php?username=...&password=..." />
         </div>
-        <button class="btn-primary" id="btnConnectM3u">Conectar M3U</button>
+        <button class="btn-primary" id="btnConnectM3u">Conectar M3U via Link</button>
       </div>
 
       <!-- Xtream Form -->
@@ -108,11 +110,32 @@
         <button class="btn-primary" id="btnConnectXtream">Conectar Xtream Codes</button>
       </div>
 
+      <!-- File Upload Form -->
+      <div id="formFile" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Selecione o arquivo .m3u ou .m3u8 baixado do seu provedor:</label>
+          <input type="file" id="inputM3uFile" accept=".m3u,.m3u8,.txt" class="form-input" style="padding: 10px;" />
+        </div>
+        <button class="btn-primary" id="btnProcessFile">⚡ Processar Arquivo Local (Sem Bloqueio)</button>
+        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 8px;">
+          💡 <b>Vantagem:</b> Funciona instantaneamente sem passar por nenhum servidor ou proxy!
+        </div>
+      </div>
+
+      <!-- Paste Text Form -->
+      <div id="formText" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Cole o conteúdo da sua lista M3U (#EXTM3U ...):</label>
+          <textarea id="textareaM3uText" class="form-input" rows="5" placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;Canais&quot;,Canal Exemplo&#10;http://..."></textarea>
+        </div>
+        <button class="btn-primary" id="btnProcessText">⚡ Processar Texto M3U</button>
+      </div>
+
       <hr style="border:0; border-top:1px solid var(--border-color); margin:18px 0;" />
 
       <!-- Proxy Options -->
       <div class="form-group">
-        <label class="form-label">Modo Proxy CORS (Para Servidores HTTP)</label>
+        <label class="form-label">Modo Proxy CORS (Para links HTTP)</label>
         <select id="selectProxyMode" class="form-input">
           <option value="auto">Automático (Testa HTTPS + 5 Proxies)</option>
           <option value="corsproxy">CorsProxy.io</option>
@@ -120,10 +143,6 @@
           <option value="allorigins">AllOrigins Raw</option>
           <option value="direct">Direto (Sem Proxy)</option>
         </select>
-      </div>
-
-      <div style="background: var(--bg-primary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
-        💡 <b>Dica para Chrome no Celular:</b> Se o seu servidor for HTTP e der erro de bloqueio no navegador, toque no ícone de <b>Cadeado 🔒 / Configurações do site</b> ➔ <b>Conteúdo não seguro</b> ➔ Marcar como <b>Permitir</b>.
       </div>
 
       <button class="btn-secondary" id="btnPresetPluto">📺 Carregar Pluto TV & Canais BR (Gratuito)</button>
