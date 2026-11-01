@@ -1,0 +1,24 @@
+{
+  "name": "Firehair IPTV Player PWA",
+  "short_name": "Firehair IPTV",
+  "description": "Aplicativo PWA moderno para IPTV com reprodução HLS nativa, M3U/M3U8 e suporte à API Xtream Codes.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0D1117",
+  "theme_color": "#0D1117",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/ thumb/3/38/Television_icon.svg/192px-Television_icon.svg.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Television_icon.svg/512px-Television_icon.svg.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

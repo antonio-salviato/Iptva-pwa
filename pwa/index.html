@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Firehair IPTV Player PWA</title>
+
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0D1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Firehair IPTV" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- HLS.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-icon">📺</div>
+      <div>
+        <div class="brand-title">Firehair IPTV</div>
+        <div class="channel-count-badge" id="channelCountBadge">0 canais</div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-icon" id="btnSettings" title="Configurações">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Video Player Section -->
+  <div class="player-wrapper hidden" id="playerContainer">
+    <video id="videoPlayer" controls playsinline x-webkit-airplay="allow"></video>
+  </div>
+
+  <!-- Search Input -->
+  <div class="search-container">
+    <input type="text" id="searchInput" class="search-input" placeholder="Pesquisar canais ou categorias..." />
+  </div>
+
+  <!-- Categories Bar -->
+  <div class="categories-bar" id="categoriesBar"></div>
+
+  <!-- Channel List -->
+  <main class="channel-list" id="channelList"></main>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-title">Configurar Playlist IPTV</div>
+
+      <div class="tab-group">
+        <button class="tab-btn active" id="tabM3u">Playlist M3U</button>
+        <button class="tab-btn" id="tabXtream">Xtream Codes API</button>
+      </div>
+
+      <!-- M3U Form -->
+      <div id="formM3u">
+        <div class="form-group">
+          <label class="form-label">URL da Playlist M3U / M3U8</label>
+          <input type="url" id="inputM3uUrl" class="form-input" placeholder="http://servidor.com/get.php?username=...&password=..." />
+        </div>
+        <button class="btn-primary" id="btnConnectM3u">Conectar M3U</button>
+      </div>
+
+      <!-- Xtream Form -->
+      <div id="formXtream" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Servidor (Ex: http://servidor.com:8080)</label>
+          <input type="url" id="inputXtreamServer" class="form-input" placeholder="http://servidor.exemplo:8080" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome de Usuário</label>
+          <input type="text" id="inputXtreamUser" class="form-input" placeholder="usuario123" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input type="password" id="inputXtreamPass" class="form-input" placeholder="senha123" />
+        </div>
+        <button class="btn-primary" id="btnConnectXtream">Conectar Xtream Codes</button>
+      </div>
+
+      <hr style="border:0; border-top:1px solid var(--border-color); margin:16px 0;" />
+
+      <button class="btn-secondary" id="btnPresetPluto">📺 Carregar Pluto TV & Canais BR (Gratuito)</button>
+      <button class="btn-secondary" id="btnPresetDemo">🎬 Testar com Canais Demo</button>
+      <button class="btn-secondary" id="btnCloseModal" style="margin-top:12px;">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="modal-overlay hidden" id="loadingOverlay">
+    <div style="background:var(--bg-surface); padding:24px; border-radius:12px; text-align:center;">
+      <div style="font-size:1.5rem; margin-bottom:8px;">⏳</div>
+      <div>Carregando canais...</div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Firehair IPTV Player",
+  "description": "Aplicativo IPTV Android moderno com reprodução HLS nativa, M3U/M3U8 parser e suporte ao Google Cast Chromecast.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
