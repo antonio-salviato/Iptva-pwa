@@ -1,21 +1,25 @@
+/* IPTV Cast / Firehair IPTV PWA - Android Parity Design */
 :root {
-  --bg-primary: #0D1117;
-  --bg-surface: #161B22;
-  --bg-surface-variant: #21262D;
-  --cyan-primary: #00E5FF;
-  --cyan-hover: #33EBFF;
-  --text-primary: #F0F6FC;
-  --text-secondary: #8B949E;
-  --border-color: #30363D;
-  --danger-color: #FF5252;
-  --warning-color: #FFC107;
+  --bg-primary: #0B0F19;
+  --bg-surface: #162032;
+  --bg-surface-variant: #1E293B;
+  --cyan-primary: #06B6D4;
+  --cyan-hover: #38BDF8;
+  --cyan-glow: rgba(6, 182, 212, 0.2);
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --border-color: #334155;
+  --danger-color: #EF4444;
+  --live-red: #DC2626;
+  --warning-color: #F59E0B;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -28,7 +32,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Header */
+/* Header - Matches Material 3 TopAppBar */
 .app-header {
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
@@ -39,73 +43,81 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .brand-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  background: rgba(0, 229, 255, 0.15);
+.brand-icon-pill {
+  background: var(--cyan-glow);
   color: var(--cyan-primary);
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
+  font-size: 1.3rem;
+  border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
 .brand-title {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.3px;
 }
 
 .channel-count-badge {
   font-size: 0.75rem;
   color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn-icon {
   background: none;
   border: none;
   color: var(--text-primary);
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.2s;
+  font-size: 1.1rem;
+  transition: all 0.2s;
 }
 
-.btn-icon:hover {
-  background: rgba(255, 255, 255, 0.1);
+.btn-icon:hover, .btn-icon:active {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .btn-icon.active {
   color: var(--cyan-primary);
+  background: var(--cyan-glow);
 }
 
-/* Player Container */
+/* Video Player Container */
 .player-wrapper {
   background: #000;
   width: 100%;
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
   position: relative;
   aspect-ratio: 16 / 9;
+  border-bottom: 2px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 video {
@@ -114,12 +126,49 @@ video {
   object-fit: contain;
 }
 
-/* Categories Bar */
+/* Search Bar Container */
+.search-container {
+  padding: 10px 16px;
+  background: var(--bg-primary);
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--cyan-primary);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  background: var(--bg-surface-variant);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px 14px 10px 40px;
+  border-radius: 24px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--cyan-primary);
+  box-shadow: 0 0 0 3px var(--cyan-glow);
+}
+
+/* Category Chips Bar */
 .categories-bar {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 12px 16px;
+  padding: 8px 16px;
   scrollbar-width: none;
 }
 
@@ -129,79 +178,75 @@ video {
 
 .chip {
   background: var(--bg-surface-variant);
-  color: var(--text-primary);
-  padding: 6px 14px;
+  color: var(--text-secondary);
+  padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.85rem;
-  font-weight: 500;
-  border: 1px solid transparent;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
 }
 
+.chip:hover {
+  color: var(--text-primary);
+  border-color: var(--cyan-hover);
+}
+
 .chip.active {
   background: var(--cyan-primary);
-  color: #000;
-  font-weight: 700;
-}
-
-/* Search Box */
-.search-container {
-  padding: 8px 16px;
-}
-
-.search-input {
-  width: 100%;
-  background: var(--bg-surface-variant);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  outline: none;
-}
-
-.search-input:focus {
+  color: #0B0F19;
   border-color: var(--cyan-primary);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
 }
 
-/* Channel List */
+/* Channel List & Folder View */
 .channel-list {
   flex: 1;
-  padding: 12px 16px;
+  padding: 12px 16px 32px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
+/* Channel Card */
 .channel-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 10px 14px;
+  border-radius: 12px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.channel-card:hover, .channel-card.active {
+.channel-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--cyan-hover);
+}
+
+.channel-card.active {
   border-color: var(--cyan-primary);
   background: var(--bg-surface-variant);
+  box-shadow: 0 0 12px var(--cyan-glow);
 }
 
 .channel-logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
   object-fit: contain;
   background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
+  flex-shrink: 0;
 }
 
 .channel-info {
@@ -209,39 +254,131 @@ video {
   overflow: hidden;
 }
 
+.channel-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .channel-name {
   font-size: 0.95rem;
   font-weight: 600;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.live-badge {
+  background: var(--live-red);
+  color: #FFF;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
 .channel-group {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
+  margin-top: 2px;
 }
 
 .btn-fav {
   background: none;
   border: none;
-  color: var(--text-secondary);
-  font-size: 1.2rem;
+  color: var(--text-muted);
+  font-size: 1.3rem;
   cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.btn-fav:hover {
+  transform: scale(1.15);
 }
 
 .btn-fav.active {
-  color: #FFD700;
+  color: #F59E0B;
 }
 
-/* Modal Dialog */
+/* Folder View Mode Components */
+.folder-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.folder-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-surface);
+  transition: background 0.2s;
+}
+
+.folder-header:hover {
+  background: var(--bg-surface-variant);
+}
+
+.folder-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.folder-icon {
+  font-size: 1.2rem;
+  color: var(--cyan-primary);
+}
+
+.folder-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.folder-count {
+  background: var(--bg-surface-variant);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.folder-arrow {
+  color: var(--text-secondary);
+  transition: transform 0.3s;
+}
+
+.folder-card.expanded .folder-arrow {
+  transform: rotate(180deg);
+}
+
+.folder-content {
+  padding: 8px 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(11, 15, 25, 0.4);
+}
+
+/* Modal Dialog - Material 3 Dark Dialog */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,27 +389,32 @@ video {
 .modal-content {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 24px;
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
 .modal-title {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  margin-bottom: 12px;
-  color: var(--cyan-primary);
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .tab-group {
   display: flex;
   background: var(--bg-surface-variant);
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   padding: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .tab-btn {
@@ -280,27 +422,30 @@ video {
   background: none;
   border: none;
   color: var(--text-secondary);
-  padding: 8px;
-  border-radius: 6px;
+  padding: 10px;
+  border-radius: 8px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .tab-btn.active {
   background: var(--cyan-primary);
-  color: #000;
+  color: #0B0F19;
+  font-weight: 700;
 }
 
 .form-group {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .form-label {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .form-input {
@@ -308,22 +453,33 @@ video {
   background: var(--bg-surface-variant);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  padding: 10px;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.92rem;
   outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--cyan-primary);
 }
 
 .btn-primary {
   width: 100%;
   background: var(--cyan-primary);
-  color: #000;
+  color: #0B0F19;
   border: none;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 700;
+  font-size: 0.95rem;
   cursor: pointer;
-  margin-top: 8px;
+  margin-top: 10px;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
 }
 
 .btn-secondary {
@@ -331,11 +487,17 @@ video {
   background: var(--bg-surface-variant);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  padding: 10px;
-  border-radius: 8px;
+  padding: 11px;
+  border-radius: 10px;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
-  margin-top: 6px;
+  margin-top: 8px;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .hidden {

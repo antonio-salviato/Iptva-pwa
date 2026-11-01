@@ -1,22 +1,26 @@
-// Firehair IPTV Player PWA - Core Logic
+// IPTV Cast / Firehair IPTV PWA - Core Logic (Android Parity)
 let allChannels = [];
 let categories = ['Todos', 'Favoritos', 'Histórico'];
 let selectedCategory = 'Todos';
 let searchQuery = '';
 let selectedChannel = null;
+let isFolderViewMode = false;
+let expandedFolders = {};
 let hls = null;
 
 const STORAGE_KEYS = {
   FAVORITES: 'firehair_pwa_favs',
   HISTORY: 'firehair_pwa_history',
   PLAYLIST_URL: 'firehair_pwa_m3u_url',
-  XTREAM_CREDS: 'firehair_pwa_xtream'
+  XTREAM_CREDS: 'firehair_pwa_xtream',
+  FOLDER_VIEW: 'firehair_pwa_folder_mode'
 };
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
   registerServiceWorker();
   initPlayer();
+  loadSavedPreferences();
   loadSavedPlaylist();
   setupEventListeners();
 });
@@ -44,45 +48,89 @@ function initPlayer() {
   }
 }
 
-// CORS & Mixed Content Bypass Helper
+function loadSavedPreferences() {
+  isFolderViewMode = localStorage.getItem(STORAGE_KEYS.FOLDER_VIEW) === 'true';
+  updateFolderToggleButton();
+}
+
+function updateFolderToggleButton() {
+  const btn = document.getElementById('btnFolderToggle');
+  if (btn) {
+    if (isFolderViewMode) {
+      btn.classList.add('active');
+      btn.title = "Modo Lista Normal";
+    } else {
+      btn.classList.remove('active');
+      btn.title = "Modo Pastas";
+    }
+  }
+}
+
+// Multi-Proxy CORS & Mixed Content Bypass Helper
 async function fetchWithCorsFallback(url, options = {}) {
-  // 1. Try direct fetch
-  try {
-    const directRes = await fetch(url, options);
-    if (directRes.ok) return directRes;
-  } catch (err) {
-    console.warn('Direct fetch failed (Mixed Content or CORS). Retrying with CORS Proxy...', err);
+  const proxies = [
+    (u) => u, // Direct fetch
+    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://thingproxy.freeboard.io/fetch/${u}`
+  ];
+
+  let lastError = null;
+
+  for (let i = 0; i < proxies.length; i++) {
+    try {
+      const targetUrl = proxies[i](url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout per proxy
+
+      const res = await fetch(targetUrl, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        return res;
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn(`Proxy ${i + 1}/${proxies.length} failed for ${url}:`, err);
+    }
   }
 
-  // 2. Try CorsProxy.io
-  try {
-    const proxyUrl1 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-    const proxyRes1 = await fetch(proxyUrl1, options);
-    if (proxyRes1.ok) return proxyRes1;
-  } catch (err) {
-    console.warn('Corsproxy failed. Retrying with AllOrigins...', err);
-  }
-
-  // 3. Try AllOrigins Proxy Raw
-  try {
-    const proxyUrl2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const proxyRes2 = await fetch(proxyUrl2, options);
-    if (proxyRes2.ok) return proxyRes2;
-  } catch (err) {
-    console.warn('AllOrigins failed. Trying ThingProxy...', err);
-  }
-
-  // 4. Try ThingProxy
-  const proxyUrl3 = `https://thingproxy.freeboard.io/fetch/${url}`;
-  return await fetch(proxyUrl3, options);
+  throw lastError || new Error('Não foi possível conectar ao servidor através dos proxies.');
 }
 
 function setupEventListeners() {
+  // Search toggle
+  document.getElementById('btnSearchToggle').addEventListener('click', () => {
+    const searchContainer = document.getElementById('searchContainer');
+    searchContainer.classList.toggle('hidden');
+    if (!searchContainer.classList.contains('hidden')) {
+      document.getElementById('searchInput').focus();
+    }
+  });
+
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value.trim().toLowerCase();
     renderChannels();
   });
 
+  // Refresh
+  document.getElementById('btnRefresh').addEventListener('click', () => {
+    loadSavedPlaylist();
+  });
+
+  // Folder View Toggle
+  document.getElementById('btnFolderToggle').addEventListener('click', () => {
+    isFolderViewMode = !isFolderViewMode;
+    localStorage.setItem(STORAGE_KEYS.FOLDER_VIEW, isFolderViewMode.toString());
+    updateFolderToggleButton();
+    renderChannels();
+  });
+
+  // Settings Modal
   document.getElementById('btnSettings').addEventListener('click', () => {
     openModal();
   });
@@ -108,7 +156,16 @@ function setupEventListeners() {
     const server = document.getElementById('inputXtreamServer').value.trim();
     const user = document.getElementById('inputXtreamUser').value.trim();
     const pass = document.getElementById('inputXtreamPass').value.trim();
-    if (server && user && pass) loadXtreamPlaylist(server, user, pass);
+
+    if (server) {
+      if (server.includes('get.php') || server.includes('.m3u') || (!user && !pass && server.includes('http'))) {
+        loadM3uPlaylist(server);
+      } else if (user && pass) {
+        loadXtreamPlaylist(server, user, pass);
+      } else {
+        alert('Por favor, informe o Usuário e a Senha ou cole o link da playlist no campo Servidor.');
+      }
+    }
   });
 
   document.getElementById('btnPresetPluto').addEventListener('click', () => {
@@ -148,8 +205,12 @@ function loadSavedPlaylist() {
   const savedXtream = localStorage.getItem(STORAGE_KEYS.XTREAM_CREDS);
 
   if (savedXtream) {
-    const creds = JSON.parse(savedXtream);
-    loadXtreamPlaylist(creds.server, creds.user, creds.pass);
+    try {
+      const creds = JSON.parse(savedXtream);
+      loadXtreamPlaylist(creds.server, creds.user, creds.pass);
+    } catch (e) {
+      loadDemoChannels();
+    }
   } else if (savedM3u) {
     loadM3uPlaylist(savedM3u);
   } else {
@@ -159,18 +220,21 @@ function loadSavedPlaylist() {
 
 async function loadM3uPlaylist(url) {
   try {
-    showLoading();
+    showLoading('Baixando playlist M3U...');
     const res = await fetchWithCorsFallback(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Status ${res.status}`);
     const text = await res.text();
     allChannels = parseM3u(text);
+    if (allChannels.length === 0) {
+      throw new Error('A lista M3U baixada não contém canais válidos.');
+    }
     localStorage.setItem(STORAGE_KEYS.PLAYLIST_URL, url);
     localStorage.removeItem(STORAGE_KEYS.XTREAM_CREDS);
     updateCategories();
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao carregar playlist M3U: ${err.message}`);
+    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\nVerifique se o link da sua playlist está correto e ativo.`);
   } finally {
     hideLoading();
   }
@@ -178,57 +242,80 @@ async function loadM3uPlaylist(url) {
 
 async function loadXtreamPlaylist(serverUrl, username, password) {
   try {
-    showLoading();
+    showLoading('Conectando ao servidor Xtream Codes...');
     let cleanServer = serverUrl.trim();
     if (!cleanServer.startsWith('http://') && !cleanServer.startsWith('https://')) {
       cleanServer = `http://${cleanServer}`;
     }
     while (cleanServer.endsWith('/')) cleanServer = cleanServer.slice(0, -1);
 
-    // Auth & Check
-    const authUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-    const authRes = await fetchWithCorsFallback(authUrl);
-    if (!authRes.ok) throw new Error(`HTTP ${authRes.status}`);
-    const authData = await authRes.json();
-    if (!authData.user_info || authData.user_info.auth === 0) {
-      throw new Error('Usuário ou senha incorretos.');
+    let loadedChannels = [];
+
+    // Attempt 1: Xtream Codes JSON API (player_api.php)
+    try {
+      showLoading('Autenticando via API...');
+      const authUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+      const authRes = await fetchWithCorsFallback(authUrl);
+      if (authRes.ok) {
+        const authData = await authRes.json();
+        if (authData.user_info && authData.user_info.auth !== 0) {
+          showLoading('Obtendo categorias e canais...');
+
+          let catMap = {};
+          try {
+            const catUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`;
+            const catRes = await fetchWithCorsFallback(catUrl);
+            if (catRes.ok) {
+              const catArray = await catRes.json();
+              catArray.forEach(c => { catMap[c.category_id] = c.category_name; });
+            }
+          } catch (e) {}
+
+          const streamsUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_streams`;
+          const streamsRes = await fetchWithCorsFallback(streamsUrl);
+          if (streamsRes.ok) {
+            const streams = await streamsRes.json();
+            if (Array.isArray(streams) && streams.length > 0) {
+              loadedChannels = streams.map(s => {
+                const streamId = s.stream_id;
+                return {
+                  id: `xtream_${streamId}`,
+                  name: s.name || `Canal ${streamId}`,
+                  group: catMap[s.category_id] || 'Canais Ao Vivo',
+                  logoUrl: s.stream_icon || null,
+                  streamUrl: `${cleanServer}/live/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.m3u8`
+                };
+              });
+            }
+          }
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API Xtream Codes falhou. Tentando modo de compatibilidade M3U (get.php)...', apiErr);
     }
 
-    // Categories
-    let catMap = {};
-    try {
-      const catUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_categories`;
-      const catRes = await fetchWithCorsFallback(catUrl);
-      if (catRes.ok) {
-        const catArray = await catRes.json();
-        catArray.forEach(c => { catMap[c.category_id] = c.category_name; });
-      }
-    } catch (e) {}
+    // Attempt 2: Fallback to get.php (M3U format) if API JSON was empty or failed
+    if (loadedChannels.length === 0) {
+      showLoading('Carregando via modo M3U do servidor (get.php)...');
+      const m3uFallbackUrl = `${cleanServer}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
+      const m3uRes = await fetchWithCorsFallback(m3uFallbackUrl);
+      if (!m3uRes.ok) throw new Error(`Servidor respondeu com status ${m3uRes.status}`);
+      const m3uText = await m3uRes.text();
+      loadedChannels = parseM3u(m3uText);
+    }
 
-    // Streams
-    const streamsUrl = `${cleanServer}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_live_streams`;
-    const streamsRes = await fetchWithCorsFallback(streamsUrl);
-    if (!streamsRes.ok) throw new Error('Falha ao carregar lista de canais');
-    const streams = await streamsRes.json();
+    if (loadedChannels.length === 0) {
+      throw new Error('Nenhum canal encontrado na conta. Verifique se a sua lista está ativa no provedor.');
+    }
 
-    allChannels = streams.map(s => {
-      const streamId = s.stream_id;
-      return {
-        id: `xtream_${streamId}`,
-        name: s.name || `Canal ${streamId}`,
-        group: catMap[s.category_id] || 'Canais Ao Vivo',
-        logoUrl: s.stream_icon || null,
-        streamUrl: `${cleanServer}/live/${encodeURIComponent(username)}/${encodeURIComponent(password)}/${streamId}.m3u8`
-      };
-    });
-
+    allChannels = loadedChannels;
     localStorage.setItem(STORAGE_KEYS.XTREAM_CREDS, JSON.stringify({ server: cleanServer, user: username, pass: password }));
     localStorage.removeItem(STORAGE_KEYS.PLAYLIST_URL);
     updateCategories();
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao conectar Xtream Codes: ${err.message}`);
+    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\nDica: Verifique se o servidor, usuário e senha estão corretos.`);
   } finally {
     hideLoading();
   }
@@ -306,6 +393,11 @@ function updateCategories() {
 
 function renderCategoryChips() {
   const container = document.getElementById('categoriesBar');
+  if (isFolderViewMode) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
   container.innerHTML = categories.map(cat => `
     <button class="chip ${cat === selectedCategory ? 'active' : ''}" onclick="selectCategory('${cat}')">
       ${cat}
@@ -335,6 +427,11 @@ function toggleFavorite(id, e) {
   renderChannels();
 }
 
+function toggleFolderExpand(groupName) {
+  expandedFolders[groupName] = !expandedFolders[groupName];
+  renderChannels();
+}
+
 function renderChannels() {
   const container = document.getElementById('channelList');
   const favs = getFavorites();
@@ -346,7 +443,7 @@ function renderChannels() {
   } else if (selectedCategory === 'Histórico') {
     const historyIds = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY) || '[]');
     filtered = historyIds.map(id => allChannels.find(c => c.id === id)).filter(Boolean);
-  } else if (selectedCategory !== 'Todos') {
+  } else if (selectedCategory !== 'Todos' && !isFolderViewMode) {
     filtered = filtered.filter(c => c.group === selectedCategory);
   }
 
@@ -357,25 +454,65 @@ function renderChannels() {
   document.getElementById('channelCountBadge').innerText = `${filtered.length} canais`;
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div style="text-align:center; padding:32px; color:var(--text-secondary);">Nenhum canal encontrado.</div>`;
+    container.innerHTML = `<div style="text-align:center; padding:48px 16px; color:var(--text-secondary);">Nenhum canal encontrado.</div>`;
     return;
   }
 
-  container.innerHTML = filtered.map(ch => {
-    const isFav = favs.includes(ch.id);
-    const logoHtml = ch.logoUrl ? `<img src="${ch.logoUrl}" class="channel-logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Television_icon.svg/40px-Television_icon.svg.png'"/>` : `<div class="channel-logo">📺</div>`;
+  // If Folder View Mode is active (and not searching)
+  if (isFolderViewMode && !searchQuery && selectedCategory === 'Todos') {
+    const groupsMap = {};
+    filtered.forEach(ch => {
+      const g = ch.group || 'Geral';
+      if (!groupsMap[g]) groupsMap[g] = [];
+      groupsMap[g].push(ch);
+    });
 
-    return `
-      <div class="channel-card ${selectedChannel && selectedChannel.id === ch.id ? 'active' : ''}" onclick="playChannel('${ch.id}')">
-        ${logoHtml}
-        <div class="channel-info">
-          <div class="channel-name">${ch.name}</div>
-          <div class="channel-group">${ch.group}</div>
+    const groupNames = Object.keys(groupsMap).sort();
+
+    container.innerHTML = groupNames.map(gName => {
+      const chList = groupsMap[gName];
+      const isExpanded = !!expandedFolders[gName];
+
+      const cardsHtml = chList.map(ch => renderChannelCardHtml(ch, favs)).join('');
+
+      return `
+        <div class="folder-card ${isExpanded ? 'expanded' : ''}">
+          <div class="folder-header" onclick="toggleFolderExpand('${gName.replace(/'/g, "\\'")}')">
+            <div class="folder-title-box">
+              <span class="folder-icon">📁</span>
+              <span class="folder-name">${gName}</span>
+              <span class="folder-count">${chList.length} canais</span>
+            </div>
+            <span class="folder-arrow">▼</span>
+          </div>
+          ${isExpanded ? `<div class="folder-content">${cardsHtml}</div>` : ''}
         </div>
-        <button class="btn-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${ch.id}', event)">★</button>
+      `;
+    }).join('');
+    return;
+  }
+
+  // Standard List View Mode
+  container.innerHTML = filtered.map(ch => renderChannelCardHtml(ch, favs)).join('');
+}
+
+function renderChannelCardHtml(ch, favs) {
+  const isFav = favs.includes(ch.id);
+  const logoHtml = ch.logoUrl ? `<img src="${ch.logoUrl}" class="channel-logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Television_icon.svg/40px-Television_icon.svg.png'"/>` : `<div class="channel-logo">📺</div>`;
+
+  return `
+    <div class="channel-card ${selectedChannel && selectedChannel.id === ch.id ? 'active' : ''}" onclick="playChannel('${ch.id}')">
+      ${logoHtml}
+      <div class="channel-info">
+        <div class="channel-name-row">
+          <span class="channel-name">${ch.name}</span>
+          <span class="live-badge">AO VIVO</span>
+        </div>
+        <div class="channel-group">${ch.group}</div>
       </div>
-    `;
-  }).join('');
+      <button class="btn-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${ch.id}', event)">★</button>
+    </div>
+  `;
 }
 
 function playChannel(id) {
@@ -403,6 +540,9 @@ function playChannel(id) {
     video.play().catch(e => console.log('Autoplay error:', e));
   }
 
+  // Scroll to player smoothly
+  document.getElementById('playerContainer').scrollIntoView({ behavior: 'smooth' });
+
   // Record History
   let history = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY) || '[]');
   history = history.filter(hId => hId !== id);
@@ -412,7 +552,9 @@ function playChannel(id) {
   renderChannels();
 }
 
-function showLoading() {
+function showLoading(msg = 'Carregando canais...') {
+  const textElem = document.getElementById('loadingText');
+  if (textElem) textElem.innerText = msg;
   document.getElementById('loadingOverlay').classList.remove('hidden');
 }
 
