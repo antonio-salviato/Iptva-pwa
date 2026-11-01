@@ -1,6 +1,6 @@
 {
-  "versionCode": 25,
-  "versionName": "1.0.15",
-  "releaseNotes": "Atualização automática de compilação #15 gerada via GitHub Actions.",
-  "downloadUrl": "https://github.com/antonio-salviato/Iptv/releases/download/v1.0.15/Firehair_IPTV_v1.0.15.apk"
+  "versionCode": 11,
+  "versionName": "1.0.1",
+  "releaseNotes": "Atualização automática de compilação #1 gerada via GitHub Actions.",
+  "downloadUrl": "https://github.com/antonio-salviato/Iptva-pwa/releases/download/v1.0.1/Firehair_IPTV_v1.0.1.apk"
 }
