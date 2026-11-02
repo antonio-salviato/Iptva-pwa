@@ -1,11 +1,10 @@
-const CACHE_NAME = 'firehair-iptv-pwa-v1';
+const CACHE_NAME = 'firehair-iptv-pwa-v2';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
-  './manifest.json',
-  'https://cdn.jsdelivr.net/npm/hls.js@latest'
+  './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,30 +33,30 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  
-  // Skip caching video stream chunks (.m3u8, .ts, etc.)
-  const url = event.request.url;
-  if (url.includes('.m3u8') || url.includes('.ts') || url.includes('player_api.php')) {
+
+  // Intercepta apenas arquivos estáticos do próprio domínio (evita quebrar proxies, APIs IPTV e streams)
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
           return networkResponse;
-        }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
+        })
+        .catch(() => {
+          return cachedResponse || new Response('Offline', { status: 503, statusText: 'Offline' });
         });
-        return networkResponse;
-      }).catch(() => {
-        return cachedResponse;
-      });
+
+      return cachedResponse || fetchPromise;
     })
   );
 });

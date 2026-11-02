@@ -7,7 +7,9 @@
 
   <!-- PWA Meta Tags -->
   <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📺</text></svg>" />
   <meta name="theme-color" content="#0B0F19" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="IPTV Cast" />
@@ -137,10 +139,10 @@
       <div class="form-group">
         <label class="form-label">Modo Proxy CORS (Para links HTTP)</label>
         <select id="selectProxyMode" class="form-input">
-          <option value="auto">Automático (Testa HTTPS + 5 Proxies)</option>
-          <option value="corsproxy">CorsProxy.io</option>
+          <option value="auto">Automático (Testa HTTPS + Proxies)</option>
+          <option value="allorigins">AllOrigins Proxy</option>
           <option value="codetabs">CodeTabs Proxy</option>
-          <option value="allorigins">AllOrigins Raw</option>
+          <option value="corsproxy">CorsProxy.io</option>
           <option value="direct">Direto (Sem Proxy)</option>
         </select>
       </div>

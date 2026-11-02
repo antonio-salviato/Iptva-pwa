@@ -35,6 +35,28 @@ function registerServiceWorker() {
   }
 }
 
+function toHttpsUpgradeCandidate(url) {
+  return url
+    .replace(/^http:\/\//i, 'https://')
+    .replace(/^(https:\/\/[^\/:]+):80(\/|$)/i, '$1$2');
+}
+
+function getProxiedStreamUrl(url) {
+  if (location.protocol !== 'https:' || !url.startsWith('http://')) {
+    return url;
+  }
+  if (selectedProxyMode === 'direct') {
+    return url;
+  }
+  if (selectedProxyMode === 'codetabs') {
+    return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+  }
+  if (selectedProxyMode === 'allorigins') {
+    return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  }
+  return `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+}
+
 function initPlayer() {
   const video = document.getElementById('videoPlayer');
   if (Hls.isSupported()) {
@@ -43,7 +65,7 @@ function initPlayer() {
       lowLatencyMode: true,
       xhrSetup: function(xhr, url) {
         if (location.protocol === 'https:' && url.startsWith('http://')) {
-          const proxied = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+          const proxied = getProxiedStreamUrl(url);
           xhr.open('GET', proxied, true);
         }
       }
@@ -77,27 +99,50 @@ function updateFolderToggleButton() {
 // Multi-Proxy CORS & Mixed Content Bypass Helper
 async function fetchWithCorsFallback(url, options = {}) {
   let targetUrls = [];
+  const isHttpsPage = location.protocol === 'https:';
+  const isHttpTarget = url.startsWith('http://');
 
-  if (selectedProxyMode === 'auto' && url.startsWith('http://')) {
-    const httpsUrl = url.replace('http://', 'https://');
-    targetUrls.push({ name: 'HTTPS Direto', url: httpsUrl });
-  }
-
-  if (selectedProxyMode === 'direct' || selectedProxyMode === 'auto') {
+  // 1. Se estivermos em HTTP (local) ou se o destino já for HTTPS, tenta conexão direta primeiro
+  if ((selectedProxyMode === 'direct' || selectedProxyMode === 'auto') && (!isHttpsPage || !isHttpTarget)) {
     targetUrls.push({ name: 'Conexão Direta', url: url });
   }
 
-  if (selectedProxyMode === 'corsproxy' || selectedProxyMode === 'auto') {
-    targetUrls.push({ name: 'Proxy (CorsProxy)', url: `https://corsproxy.io/?${encodeURIComponent(url)}` });
+  // 2. Se estivermos em HTTPS e o alvo for HTTP, tenta versão HTTPS sem a porta :80 (evita ERR_SSL_PROTOCOL_ERROR na porta 80)
+  if (selectedProxyMode === 'auto' && isHttpTarget) {
+    const httpsUrl = toHttpsUpgradeCandidate(url);
+    targetUrls.push({ name: 'HTTPS Direto', url: httpsUrl });
   }
-  if (selectedProxyMode === 'codetabs' || selectedProxyMode === 'auto') {
-    targetUrls.push({ name: 'Proxy (CodeTabs)', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` });
-  }
+
+  // 3. Proxies HTTPS para contornar CORS e Mixed Content
   if (selectedProxyMode === 'allorigins' || selectedProxyMode === 'auto') {
-    targetUrls.push({ name: 'Proxy (AllOrigins)', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` });
+    targetUrls.push({
+      name: 'Proxy (AllOrigins JSON)',
+      url: `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      unwrapAllOriginsJson: true
+    });
+    targetUrls.push({
+      name: 'Proxy (AllOrigins Raw)',
+      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    });
   }
-  if (selectedProxyMode === 'auto') {
-    targetUrls.push({ name: 'Proxy (ThingProxy)', url: `https://thingproxy.freeboard.io/fetch/${url}` });
+
+  if (selectedProxyMode === 'codetabs' || selectedProxyMode === 'auto') {
+    targetUrls.push({
+      name: 'Proxy (CodeTabs)',
+      url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+    });
+  }
+
+  if (selectedProxyMode === 'corsproxy' || selectedProxyMode === 'auto') {
+    targetUrls.push({
+      name: 'Proxy (CorsProxy)',
+      url: `https://corsproxy.io/?url=${encodeURIComponent(url)}`
+    });
+  }
+
+  // Caso o usuário tenha forçado 'direct' mesmo em HTTPS+HTTP
+  if (selectedProxyMode === 'direct' && targetUrls.length === 0) {
+    targetUrls.push({ name: 'Conexão Direta', url: url });
   }
 
   let lastError = null;
@@ -108,7 +153,7 @@ async function fetchWithCorsFallback(url, options = {}) {
       showLoading('Conectando ao servidor...', `Tentativa ${i + 1}/${targetUrls.length}: ${item.name}`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       const res = await fetch(item.url, {
         ...options,
@@ -117,6 +162,19 @@ async function fetchWithCorsFallback(url, options = {}) {
       clearTimeout(timeoutId);
 
       if (res.ok) {
+        if (item.unwrapAllOriginsJson) {
+          const data = await res.json();
+          if (data && typeof data.contents === 'string' && data.contents.length > 0) {
+            const contents = data.contents;
+            return {
+              ok: true,
+              status: (data.status && data.status.http_code) || 200,
+              text: async () => contents,
+              json: async () => JSON.parse(contents)
+            };
+          }
+          continue;
+        }
         return res;
       }
     } catch (err) {
@@ -124,7 +182,11 @@ async function fetchWithCorsFallback(url, options = {}) {
     }
   }
 
-  throw lastError || new Error('Não foi possível conectar ao servidor através dos proxies.');
+  const mixedContentHint = (isHttpsPage && isHttpTarget)
+    ? '\n\n⚠️ O navegador bloqueia conexões HTTP diretas em páginas HTTPS (GitHub Pages) e o seu servidor IPTV bloqueou os proxies públicos gratuitos.'
+    : '';
+
+  throw new Error((lastError ? lastError.message : 'Falha na conexão.') + mixedContentHint);
 }
 
 function setupEventListeners() {
@@ -317,7 +379,11 @@ function loadM3uContent(text, sourceName = 'Arquivo Local M3U', saveToStorage = 
   }
 
   if (saveToStorage) {
-    localStorage.setItem(STORAGE_KEYS.PLAYLIST_CONTENT, text);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLAYLIST_CONTENT, text);
+    } catch (storageErr) {
+      console.warn('Lista muito grande para salvar no localStorage:', storageErr);
+    }
     localStorage.removeItem(STORAGE_KEYS.PLAYLIST_URL);
     localStorage.removeItem(STORAGE_KEYS.XTREAM_CREDS);
   }
@@ -357,7 +423,7 @@ async function loadM3uPlaylist(url) {
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\n💡 OUTRAS OPÇÕES:\n1. Baixe o arquivo .m3u no seu celular e use a aba "📁 Arquivo" nas Configurações.\n2. Ou copie o texto do arquivo e use a aba "📋 Colar".`);
+    alert(`Erro ao carregar playlist M3U:\n\n${err.message}\n\n💡 OUTRAS OPÇÕES:\n1. Baixe o arquivo .m3u no seu aparelho e use a aba "📁 Arquivo" nas Configurações.\n2. Ou copie o texto do arquivo e use a aba "📋 Colar".\n3. Para usar listas HTTP sem restrições, rode localmente via HTTP.`);
   } finally {
     hideLoading();
   }
@@ -446,7 +512,8 @@ async function loadXtreamPlaylist(serverUrl, username, password) {
     renderChannels();
     closeModal();
   } catch (err) {
-    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\n💡 OUTRA ABORDAGEM:\nAbra a URL no seu navegador para baixar o arquivo .m3u, depois use a aba "📁 Arquivo" nas Configurações para carregar instantaneamente.`);
+    const fallbackDownloadUrl = `${serverUrl.replace(/\/+$/, '')}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`;
+    alert(`Erro ao conectar ao Xtream Codes:\n\n${err.message}\n\n💡 SOLUÇÃO RÁPIDA:\n1. Baixe seu arquivo .m3u abrindo no navegador:\n${fallbackDownloadUrl}\n2. Use a aba "📁 Arquivo" nas Configurações para carregar instantaneamente.`);
   } finally {
     hideLoading();
   }
@@ -684,7 +751,7 @@ function playChannel(id) {
     });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     if (location.protocol === 'https:' && targetUrl.startsWith('http://')) {
-      targetUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      targetUrl = getProxiedStreamUrl(targetUrl);
     }
     video.src = targetUrl;
     video.play().catch(e => console.log('Autoplay error:', e));
